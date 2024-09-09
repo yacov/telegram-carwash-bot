@@ -1,0 +1,5 @@
+pyrogram
+tgcrypto
+airtable-python-wrapper
+apscheduler
+python-dotenv
