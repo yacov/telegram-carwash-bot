@@ -120,6 +120,10 @@ async def get_chat_id(client, message):
     logger.info(f"Chat ID {chat_id} and Thread ID {thread_id} requested by user {message.from_user.id}")
     await message.reply(f"The chat ID for this conversation is: {chat_id}\nThe topic ID (message_thread_id) is: {thread_id}")
 
+@app.on_message(filters.command("cars"))
+async def cars_command(client, message):
+    await send_update(client, message)
+
 app = Flask('')
 
 @app.route('/')
