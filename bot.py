@@ -1,14 +1,13 @@
 import os
 import logging
 from datetime import datetime, timedelta
-from threading import Thread
 from flask import Flask, request
-
 from airtable import Airtable
 from dotenv import load_dotenv
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import PeerIdInvalid
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -131,23 +130,25 @@ flask_app = Flask('')
 def home():
     return "Hello. I am alive!"
 
-# Threaded function to run the Pyrogram client
-def run_pyrogram():
-    logger.info("Starting Pyrogram client...")
-    app.start()
-    app.idle()
-
-# Function to run Flask server
-def run_flask():
+# Function to run Flask asynchronously
+async def run_flask():
     logger.info("Starting Flask server...")
-    flask_app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, flask_app.run, '0.0.0.0', int(os.environ.get('PORT', 8080)))
+
+async def main():
+    # Start Pyrogram client
+    await app.start()
+    logger.info("Pyrogram bot started.")
+
+    # Run Flask server in parallel
+    await run_flask()
+
+    # Keep the bot running indefinitely
+    await asyncio.Event().wait()
 
 if __name__ == '__main__':
     logger.info("Starting the bot...")
 
-    # Start Pyrogram bot in a separate thread
-    pyrogram_thread = Thread(target=run_pyrogram)
-    pyrogram_thread.start()
-
-    # Start Flask server in the main thread
-    run_flask()
+    # Start the asyncio event loop
+    asyncio.run(main())
