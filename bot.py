@@ -124,20 +124,30 @@ async def get_chat_id(client, message):
 async def cars_command(client, message):
     await send_update(client, message)
 
-app = Flask('')
+# Flask app
+flask_app = Flask('')
 
-@app.route('/')
+@flask_app.route('/')
 def home():
     return "Hello. I am alive!"
 
-def run():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+# Threaded function to run the Pyrogram client
+def run_pyrogram():
+    logger.info("Starting Pyrogram client...")
+    app.start()
+    app.idle()
 
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
+# Function to run Flask server
+def run_flask():
+    logger.info("Starting Flask server...")
+    flask_app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
 
 if __name__ == '__main__':
     logger.info("Starting the bot...")
-    keep_alive()  # Add this line
-    app.run()
+
+    # Start Pyrogram bot in a separate thread
+    pyrogram_thread = Thread(target=run_pyrogram)
+    pyrogram_thread.start()
+
+    # Start Flask server in the main thread
+    run_flask()
