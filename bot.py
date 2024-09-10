@@ -1,6 +1,8 @@
 import os
 import logging
 from datetime import datetime, timedelta
+from threading import Thread
+from flask import Flask, request
 
 from airtable import Airtable
 from dotenv import load_dotenv
@@ -118,6 +120,20 @@ async def get_chat_id(client, message):
     logger.info(f"Chat ID {chat_id} and Thread ID {thread_id} requested by user {message.from_user.id}")
     await message.reply(f"The chat ID for this conversation is: {chat_id}\nThe topic ID (message_thread_id) is: {thread_id}")
 
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Hello. I am alive!"
+
+def run():
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
 if __name__ == '__main__':
     logger.info("Starting the bot...")
+    keep_alive()  # Add this line
     app.run()
