@@ -3,9 +3,9 @@ import logging
 from datetime import datetime, timedelta
 
 from airtable import Airtable
-from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import PeerIdInvalid
 
 # Configure logging
@@ -33,8 +33,7 @@ cardryers_table = Airtable(BASE_ID, 'CarDryers', api_key=AIRTABLE_API_KEY)
 polish_table = Airtable(BASE_ID, 'Polish', api_key=AIRTABLE_API_KEY)
 
 # Initialize Pyrogram client
-app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-
+app = Client("WorkBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 def get_today_stats():
     logger.info("Fetching today's stats")
@@ -71,71 +70,54 @@ def get_today_stats():
     logger.info(f"Stats fetched: {stats}")
     return stats
 
+def get_keyboard():
+    """Generate the inline keyboard."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Cars Today", callback_data="cars_today")]
+    ])
 
-async def send_update():
+async def send_update(client, message):
+    """Send update message."""
     logger.info("Sending update")
     try:
         stats = get_today_stats()
         current_time = datetime.now().strftime("%H:%M")
 
-        message = f"1. Time: {current_time}. Cars processed today until now:\n"
-        message += f"   * Total - {stats['total_processed']}\n"
-        message += f"   * Washed - {stats['total_washed']} (Normal: {stats['normal_wash']}, Additional cleaning: {stats['additional_cleaning']}, Light wash: {stats['light_wash']})\n"
-        message += f"   * Dried - {stats['total_dryed']}\n"
-        message += f"   * Polished - {stats['total_polished']} (Full polish: {stats['full_polish']}, Half polish: {stats['half_polish']})"
+        message_text = f"1. Time: {current_time}. Cars processed today until now:\n"
+        message_text += f"   * Total - {stats['total_processed']}\n"
+        message_text += f"   * Washed - {stats['total_washed']} (Normal: {stats['normal_wash']}, Additional cleaning: {stats['additional_cleaning']}, Light wash: {stats['light_wash']})\n"
+        message_text += f"   * Dried - {stats['total_dryed']}\n"
+        message_text += f"   * Polished - {stats['total_polished']} (Full polish: {stats['full_polish']}, Half polish: {stats['half_polish']})"
 
-        try:
-            await app.send_message(CHAT_ID, message)
-            logger.info(f"Message sent successfully to chat {CHAT_ID}")
-            return True, "Update sent successfully!"
-        except PeerIdInvalid:
-            error_msg = f"Error: Invalid CHAT_ID {CHAT_ID}. Please check your .env file and ensure the bot has access to this chat."
-            logger.error(error_msg)
-            return False, error_msg
+        await message.reply(message_text, reply_markup=get_keyboard())
+        logger.info("Message sent successfully")
     except Exception as e:
         error_msg = f"Error in send_update: {str(e)}"
         logger.exception(error_msg)
-        return False, error_msg
-
-
-def schedule_updates():
-    logger.info("Scheduling updates")
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(send_update, 'interval', minutes=10)
-    scheduler.start()
-    logger.info("Updates scheduled successfully")
-
+        await message.reply(f"Failed to send update. Error: {error_msg}")
 
 @app.on_message(filters.command("start"))
 async def start_command(client, message):
     logger.info(f"Start command received from user {message.from_user.id}")
     await message.reply(
-        "Hello! I'm your car wash bot. I'll send updates every 30 minutes"
-        " about the day's activities. Use /update to get the latest stats"
-        " and /getchatid to get the current chat ID.")
+        "Hello! I'm your car wash bot. Use the 'Cars Today' button below to get the latest stats.",
+        reply_markup=get_keyboard()
+    )
 
-
-@app.on_message(filters.command("update"))
-async def manual_update(client, message):
-    logger.info(f"Manual update requested by user {message.from_user.id}")
-    success, result = await send_update()
-    if success:
-        logger.info("Manual update sent successfully")
-        await message.reply(result)
-    else:
-        logger.error(f"Manual update failed: {result}")
-        await message.reply(f"Failed to send update. Error: {result}")
-
+@app.on_callback_query()
+async def handle_callback(client, callback_query):
+    if callback_query.data == "cars_today":
+        logger.info(f"Cars Today button pressed by user {callback_query.from_user.id}")
+        await send_update(client, callback_query.message)
+    await callback_query.answer()
 
 @app.on_message(filters.command("getchatid"))
 async def get_chat_id(client, message):
     chat_id = message.chat.id
-    logger.info(f"Chat ID {chat_id} requested by user {message.from_user.id}")
-    await message.reply(f"The chat ID for this conversation is: {chat_id}")
-
+    thread_id = message.message_thread_id if message.message_thread_id else "Not a topic"
+    logger.info(f"Chat ID {chat_id} and Thread ID {thread_id} requested by user {message.from_user.id}")
+    await message.reply(f"The chat ID for this conversation is: {chat_id}\nThe topic ID (message_thread_id) is: {thread_id}")
 
 if __name__ == '__main__':
     logger.info("Starting the bot...")
-    logger.info(f"Current CHAT_ID: {CHAT_ID}")
-    schedule_updates()
     app.run()
