@@ -102,7 +102,7 @@ async def send_update(client, message):
 async def start_command(client, message):
     logger.info(f"Start command received from user {message.from_user.id}")
     await message.reply(
-        "Hello! I'm your car wash bot. Use the 'Cars Today' button below to get the latest stats.",
+        "Hello! I'm your car wash bot (v2.0). Use the 'Cars Today' button below to get the latest stats.",
         reply_markup=get_keyboard()
     )
 
