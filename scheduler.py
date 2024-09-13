@@ -19,6 +19,7 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
     message_text = generate_message_text(stats, current_time, language)
     await context.bot.send_message(chat_id=chat_id, text=message_text)
 
+
 def schedule_daily_report(application, chat_id):
     job_queue = application.job_queue
-    job_queue.run_daily(send_daily_report, time(hour=23, minute=59), chat_id=chat_id, data={'language': 'en'})
+    job_queue.run_daily(send_daily_report, time(hour=23, minute=59), chat_id=chat_id, data={'language': 'ru'})

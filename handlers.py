@@ -2,7 +2,7 @@ import logging
 from telegram import Update
 import telegram
 from telegram.ext import ContextTypes
-from database import get_today_stats, get_worker_data, update_worker_language
+from database import get_today_stats, get_worker_data
 from keyboards import get_language_menu, get_main_keyboard, LANGUAGES
 from message_constants import MESSAGES
 from datetime import datetime
@@ -65,10 +65,13 @@ async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def send_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         airtable_tables = context.bot_data.get('airtable_tables', {})
-        if 'scans' not in airtable_tables:
-            raise KeyError("Scans table not found in Airtable tables")
+        if not all(table in airtable_tables for table in ['scans', 'cardryers', 'polish']):
+            raise KeyError("One or more required Airtable tables not found")
         
-        stats = await get_today_stats(airtable_tables['scans'])
+        logger.info("Fetching today's stats from Airtable...")
+        stats = await get_today_stats(airtable_tables)
+        logger.info(f"Fetched stats: {stats}")
+        
         current_time = datetime.now().strftime("%H:%M")
 
         user_id = update.effective_user.id if isinstance(update, Update) else update.from_user.id
@@ -78,13 +81,7 @@ async def send_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if isinstance(update, Update):
             await update.message.reply_text(message_text, reply_markup=await get_main_keyboard(user_language))
         else:
-            try:
-                await update.edit_message_text(message_text, reply_markup=await get_main_keyboard(user_language))
-            except telegram.error.BadRequest as e:
-                if str(e) == "Message is not modified":
-                    await update.answer(get_message("stats_up_to_date", user_language))
-                else:
-                    raise
+            await update.edit_message_text(message_text, reply_markup=await get_main_keyboard(user_language))
 
     except Exception as e:
         error_msg = f"Error in send_update: {str(e)}"

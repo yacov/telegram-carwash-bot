@@ -43,7 +43,8 @@ class Bot:
 
             # Initialize Airtable tables
             self.airtable_tables = init_airtable_tables()
-            self.application.bot_data['airtable_tables'] = self.airtable_tables  # Update this line
+            self.application.bot_data['airtable_tables'] = self.airtable_tables
+            logger.info("Airtable tables initialized and stored in bot_data")
 
             # Add handlers
             self.application.add_handler(CommandHandler("start", start_command))
