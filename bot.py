@@ -1,154 +1,120 @@
 import os
 import logging
-from datetime import datetime, timedelta
-from flask import Flask, request
-from airtable import Airtable
-from dotenv import load_dotenv
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import PeerIdInvalid
 import asyncio
+import signal
+
+from telegram import Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, Defaults
+from dotenv import load_dotenv
+
+from database import init_airtable_tables
+from handlers import start_command, language_command, set_language_callback, send_update, handle_callback
+from scheduler import schedule_daily_report
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+file_handler = logging.FileHandler('bot.log')
+file_handler.setLevel(logging.INFO)
+logger.addHandler(file_handler)
 
-# Load .env file if it exists
 load_dotenv()
 
-# Telegram API credentials
-API_ID = os.environ.get('API_ID')
-API_HASH = os.environ.get('API_HASH')
-BOT_TOKEN = os.environ.get('BOT_TOKEN')
+class Bot:
+    def __init__(self, token, chat_id):
+        """
+        Initialize the Bot class with token and chat_id.
+        
+        :param token: Bot token for authentication
+        :param chat_id: Chat ID for sending messages
+        """
+        self.token = token
+        self.chat_id = chat_id
+        self.application = None
+        self.airtable_tables = None  # Add this line
 
-# Airtable credentials
-AIRTABLE_API_KEY = os.environ.get('AIRTABLE_API_KEY')
-BASE_ID = os.environ.get('BASE_ID')
+    async def start(self):
+        """
+        Start the bot, initialize handlers, and begin polling for updates.
+        """
+        try:
+            defaults = Defaults(parse_mode="HTML")
+            self.application = Application.builder().token(self.token).defaults(defaults).build()
 
-# Chat ID where the bot will send messages
-CHAT_ID = os.environ.get('CHAT_ID')
+            # Initialize Airtable tables
+            self.airtable_tables = init_airtable_tables()
+            self.application.bot_data['airtable_tables'] = self.airtable_tables  # Update this line
 
-# Initialize Airtable tables
-scans_table = Airtable(BASE_ID, 'Scans', api_key=AIRTABLE_API_KEY)
-cardryers_table = Airtable(BASE_ID, 'CarDryers', api_key=AIRTABLE_API_KEY)
-polish_table = Airtable(BASE_ID, 'Polish', api_key=AIRTABLE_API_KEY)
+            # Add handlers
+            self.application.add_handler(CommandHandler("start", start_command))
+            self.application.add_handler(CommandHandler("language", language_command))
+            self.application.add_handler(CallbackQueryHandler(set_language_callback, pattern="^set_language"))
+            self.application.add_handler(CallbackQueryHandler(handle_callback))
+            self.application.add_handler(CommandHandler("cars", send_update))
 
-# Initialize Pyrogram client
-app = Client("WorkBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+            # Add error handler
+            self.application.add_error_handler(self.error_handler)
 
-def get_today_stats():
-    logger.info("Fetching today's stats")
-    today = datetime.now().date()
-    tomorrow = today + timedelta(days=1)
+            # Schedule daily report
+            schedule_daily_report(self.application, self.chat_id)
 
-    # Get scans (washes) for today
-    scans = scans_table.get_all(formula=f"AND(IS_SAME({{Timestamp}}, '{today}', 'day'), IS_BEFORE({{Timestamp}}, '{tomorrow}'))")
-    total_washed = len(scans)
-    normal_wash = sum(1 for scan in scans if not scan['fields'].get('CleanGlue') and not scan['fields'].get('ReturnCleaning'))
-    additional_cleaning = sum(1 for scan in scans if scan['fields'].get('CleanGlue') and not scan['fields'].get('ReturnCleaning'))
-    light_wash = sum(1 for scan in scans if not scan['fields'].get('CleanGlue') and scan['fields'].get('ReturnCleaning'))
-    dryed = cardryers_table.get_all(formula=f"AND(IS_SAME({{Work Started}}, '{today}', 'day'), IS_BEFORE({{Work Started}}, '{tomorrow}'))")
-    total_dryed = len(dryed)
+            # Start the bot
+            await self.application.initialize()
+            await self.application.start()
+            await self.application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
 
-    # Get polishing jobs for today
-    polished = polish_table.get_all(formula=f"AND(IS_SAME({{Timestamp}}, '{today}', 'day'), IS_BEFORE({{Timestamp}}, '{tomorrow}'))")
-    total_polished = len(polished)
-    full_polish = sum(1 for polish in polished if polish['fields'].get('Services') == 'FullPolish')
-    half_polish = sum(1 for polish in polished if polish['fields'].get('Services') == 'HalfPolish')
+            logger.info("Bot started. Press Ctrl+C to stop.")
+            
+            # Keep the bot running
+            while True:
+                await asyncio.sleep(1)
 
-    stats = {
-        'total_processed': total_washed + total_dryed + total_polished,
-        'total_washed': total_washed,
-        'normal_wash': normal_wash,
-        'additional_cleaning': additional_cleaning,
-        'light_wash': light_wash,
-        'total_dryed': total_dryed,
-        'total_polished': total_polished,
-        'full_polish': full_polish,
-        'half_polish': half_polish
-    }
+        except asyncio.CancelledError:
+            logger.info("Bot is shutting down...")
+        except Exception as e:
+            logger.error(f"Failed to run the bot: {e}")
+        finally:
+            if self.application:
+                await self.application.stop()
+                await self.application.shutdown()
 
-    logger.info(f"Stats fetched: {stats}")
-    return stats
+    async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """
+        Handle errors that occur during the execution of handlers.
 
-def get_keyboard():
-    """Generate the inline keyboard."""
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Cars Today", callback_data="cars_today")]
-    ])
+        :param update: The update that caused the error
+        :param context: The context object containing error details
+        """
+        try:
+            logger.error(f"Exception while handling an update: {context.error}", exc_info=True)  # Update this line
+            if isinstance(update, Update) and update.effective_message:
+                await update.effective_message.reply_text("An error occurred. Please try again later.")
+        except Exception as e:
+            logger.exception(f"Error while sending error message: {e}")
 
-async def send_update(client, message):
-    """Send update message."""
-    logger.info("Sending update")
-    try:
-        stats = get_today_stats()
-        current_time = datetime.now().strftime("%H:%M")
-
-        message_text = f"1. Time: {current_time}. Cars processed today until now:\n"
-        message_text += f"   * Total - {stats['total_processed']}\n"
-        message_text += f"   * Washed - {stats['total_washed']} (Normal: {stats['normal_wash']}, Additional cleaning: {stats['additional_cleaning']}, Light wash: {stats['light_wash']})\n"
-        message_text += f"   * Dried - {stats['total_dryed']}\n"
-        message_text += f"   * Polished - {stats['total_polished']} (Full polish: {stats['full_polish']}, Half polish: {stats['half_polish']})"
-
-        await message.reply(message_text, reply_markup=get_keyboard())
-        logger.info("Message sent successfully")
-    except Exception as e:
-        error_msg = f"Error in send_update: {str(e)}"
-        logger.exception(error_msg)
-        await message.reply(f"Failed to send update. Error: {error_msg}")
-
-@app.on_message(filters.command("start"))
-async def start_command(client, message):
-    logger.info(f"Start command received from user {message.from_user.id}")
-    await message.reply(
-        "Hello! I'm your car wash bot (v2.0). Use the 'Cars Today' button below to get the latest stats.",
-        reply_markup=get_keyboard()
-    )
-
-@app.on_callback_query()
-async def handle_callback(client, callback_query):
-    if callback_query.data == "cars_today":
-        logger.info(f"Cars Today button pressed by user {callback_query.from_user.id}")
-        await send_update(client, callback_query.message)
-    await callback_query.answer()
-
-@app.on_message(filters.command("getchatid"))
-async def get_chat_id(client, message):
-    chat_id = message.chat.id
-    thread_id = message.message_thread_id if message.message_thread_id else "Not a topic"
-    logger.info(f"Chat ID {chat_id} and Thread ID {thread_id} requested by user {message.from_user.id}")
-    await message.reply(f"The chat ID for this conversation is: {chat_id}\nThe topic ID (message_thread_id) is: {thread_id}")
-
-@app.on_message(filters.command("cars"))
-async def cars_command(client, message):
-    await send_update(client, message)
-
-# Flask app
-flask_app = Flask('')
-
-@flask_app.route('/')
-def home():
-    return "Hello. I am alive!"
-
-# Function to run Flask asynchronously
-async def run_flask():
-    logger.info("Starting Flask server...")
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, flask_app.run, '0.0.0.0', int(os.environ.get('PORT', 8080)))
+def shutdown_handler(*args):
+    """
+    Handle graceful shutdown on SIGINT.
+    """
+    if bot.application:
+        asyncio.create_task(bot.application.stop())
 
 async def main():
-    # Start Pyrogram client
-    await app.start()
-    logger.info("Pyrogram bot started.")
-
-    # Run Flask server in parallel
-    await run_flask()
-
-    # Keep the bot running indefinitely
-    await asyncio.Event().wait()
+    """
+    Main function to run the bot.
+    """
+    global bot
+    bot = Bot(token="6860364776:AAEF-X-aFT__wy3KffYstEVQnIfi-QIrdLU", chat_id=os.environ.get('CHAT_ID'))
+    
+    # Register shutdown handler
+    signal.signal(signal.SIGINT, shutdown_handler)
+    
+    await bot.start()
 
 if __name__ == '__main__':
-    logger.info("Starting the bot...")
-
-    # Start the asyncio event loop
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped manually.")
+    except Exception as e:
+        logger.exception(f"Unhandled exception: {e}")

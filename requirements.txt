@@ -1,4 +1,4 @@
-pyrogram
+python-telegram-bot==21.5
 tgcrypto
 airtable-python-wrapper
 apscheduler
