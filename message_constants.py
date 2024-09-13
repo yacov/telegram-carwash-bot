@@ -5,7 +5,8 @@ MESSAGES = {
         "select_language": "Пожалуйста, выберите язык:",
         "stats_up_to_date": "Статистика актуальна!",
         "failed_update": "Не удалось обновить: {}",
-        "error_occurred": "Произошла ошибка: {}"
+        "error_occurred": "Произошла ошибка: {}",
+        "cars_yesterday": "Машины вчера"
     },
     "en": {
         "welcome": "Hello! I'm your car wash bot (v2.0). Choose an option:",
@@ -13,7 +14,8 @@ MESSAGES = {
         "select_language": "Please select your language:",
         "stats_up_to_date": "Stats are up to date!",
         "failed_update": "Failed to update: {}",
-        "error_occurred": "An error occurred: {}"
+        "error_occurred": "An error occurred: {}",
+        "cars_yesterday": "Cars Yesterday"
     },
     "he": {
         "welcome": "שלום! אני הבוט שלך לשטיפת מכוניות (גרסה 2.0). בחר אפשרות:",
@@ -21,6 +23,7 @@ MESSAGES = {
         "select_language": "אנא בחר את השפה שלך:",
         "stats_up_to_date": "הסטטיסטיקה מעודכנת!",
         "failed_update": "עדכון נכשל: {}",
-        "error_occurred": "אירעה שגיאה: {}"
+        "error_occurred": "אירעה שגיאה: {}",
+        "cars_yesterday": "מכוניות אתמול"
     }
 }

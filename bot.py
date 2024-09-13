@@ -8,7 +8,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 from dotenv import load_dotenv
 
 from database import init_airtable_tables
-from handlers import start_command, language_command, set_language_callback, send_update, handle_callback
+from handlers import start_command, language_command, set_language_callback, send_update, handle_callback, send_yesterday_update
 from scheduler import schedule_daily_report
 
 # Configure logging
@@ -52,6 +52,8 @@ class Bot:
             self.application.add_handler(CallbackQueryHandler(set_language_callback, pattern="^set_language"))
             self.application.add_handler(CallbackQueryHandler(handle_callback))
             self.application.add_handler(CommandHandler("cars", send_update))
+            self.application.add_handler(CommandHandler("yesterday", send_yesterday_update))
+            self.application.add_handler(CallbackQueryHandler(send_yesterday_update, pattern="^cars_yesterday$"))
 
             # Add error handler
             self.application.add_error_handler(self.error_handler)

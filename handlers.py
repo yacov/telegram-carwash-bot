@@ -2,7 +2,7 @@ import logging
 from telegram import Update
 import telegram
 from telegram.ext import ContextTypes
-from database import get_today_stats, get_worker_data
+from database import get_today_stats, get_yesterday_stats, get_worker_data
 from keyboards import get_language_menu, get_main_keyboard, LANGUAGES
 from message_constants import MESSAGES
 from datetime import datetime
@@ -14,17 +14,32 @@ def get_message(key: str, language: str) -> str:
 
 def generate_message_text(stats, current_time, user_language):
     if user_language == "ru":
-        message_text = f"1. Время: {current_time}. С начала дня сделано:\n"
-        message_text += f"   * Помыто - {stats['total_washed']} (Мойка: {stats['normal_wash']}, Клей: {stats['additional_cleaning']}, Легкая мойка: {stats['light_wash']})\n"
-        message_text += f"   * Отполировано - {stats['total_polished']} (4+ деталей: {stats['full_polish']}, 1-3 детали: {stats['half_polish']})"
+        message_text = f"<b>Статистика на {current_time}:</b>\n\n"
+        message_text += f"🚿 <b>Помыто:</b> {stats['total_washed']}\n"
+        message_text += f"   • Мойка: {stats['normal_wash']}\n"
+        message_text += f"   • Клей: {stats['additional_cleaning']}\n"
+        message_text += f"   • Легкая мойка: {stats['light_wash']}\n\n"
+        message_text += f"✨ <b>Отполировано:</b> {stats['total_polished']}\n"
+        message_text += f"   • 4+ деталей: {stats['full_polish']}\n"
+        message_text += f"   • 1-3 детали: {stats['half_polish']}\n"
     elif user_language == "he":
-        message_text = f"1. זמן: {current_time}. מתחילת היום בוצעו:\n"
-        message_text += f"   * נשטפו - {stats['total_washed']} (שטיפה: {stats['normal_wash']}, דבק: {stats['additional_cleaning']}, שטיפה קלה: {stats['light_wash']})\n"
-        message_text += f"   * הוברקו - {stats['total_polished']} (4+ חלקים: {stats['full_polish']}, 1-3 חלקים: {stats['half_polish']})"
+        message_text = f"<b>סטטיסטיקה נכון ל-{current_time}:</b>\n\n"
+        message_text += f"🚿 <b>נשטפו:</b> {stats['total_washed']}\n"
+        message_text += f"   • שטיפה רגילה: {stats['normal_wash']}\n"
+        message_text += f"   • ניקוי דבק: {stats['additional_cleaning']}\n"
+        message_text += f"   • שטיפה קלה: {stats['light_wash']}\n\n"
+        message_text += f"✨ <b>הוברקו:</b> {stats['total_polished']}\n"
+        message_text += f"   • 4+ חלקים: {stats['full_polish']}\n"
+        message_text += f"   • 1-3 חלקים: {stats['half_polish']}\n"
     else:  # Default to English
-        message_text = f"1. Time: {current_time}. Since the beginning of the day:\n"
-        message_text += f"   * Washed - {stats['total_washed']} (Wash: {stats['normal_wash']}, Glue: {stats['additional_cleaning']}, Light wash: {stats['light_wash']})\n"
-        message_text += f"   * Polished - {stats['total_polished']} (4+ parts: {stats['full_polish']}, 1-3 parts: {stats['half_polish']})"
+        message_text = f"<b>Statistics as of {current_time}:</b>\n\n"
+        message_text += f"🚿 <b>Washed:</b> {stats['total_washed']}\n"
+        message_text += f"   • Regular wash: {stats['normal_wash']}\n"
+        message_text += f"   • Glue cleaning: {stats['additional_cleaning']}\n"
+        message_text += f"   • Light wash: {stats['light_wash']}\n\n"
+        message_text += f"✨ <b>Polished:</b> {stats['total_polished']}\n"
+        message_text += f"   • 4+ parts: {stats['full_polish']}\n"
+        message_text += f"   • 1-3 parts: {stats['half_polish']}\n"
     return message_text
 
 async def get_user_language(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> str:
@@ -99,5 +114,69 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "cars_today":
         await send_update(query, context)
+    elif query.data == "cars_yesterday":
+        await send_yesterday_update(query, context)
     elif query.data == "language":
         await language_command(update, context)
+
+async def send_yesterday_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        airtable_tables = context.bot_data.get('airtable_tables', {})
+        if not all(table in airtable_tables for table in ['scans', 'cardryers', 'polish']):
+            raise KeyError("One or more required Airtable tables not found")
+        
+        logger.info("Fetching yesterday's stats from Airtable...")
+        stats = await get_yesterday_stats(airtable_tables)
+        logger.info(f"Fetched yesterday's stats: {stats}")
+        
+        user_id = update.effective_user.id if isinstance(update, Update) else update.from_user.id
+        user_language = await get_user_language(context, user_id)
+        message_text = generate_yesterday_message_text(stats, user_language)
+
+        if isinstance(update, Update):
+            await update.message.reply_text(message_text, reply_markup=await get_main_keyboard(user_language))
+        else:
+            await update.edit_message_text(message_text, reply_markup=await get_main_keyboard(user_language))
+
+    except Exception as e:
+        error_msg = f"Error in send_yesterday_update: {str(e)}"
+        logger.exception(error_msg)
+        user_id = update.effective_user.id if isinstance(update, Update) else update.from_user.id
+        user_language = await get_user_language(context, user_id)
+        if isinstance(update, Update):
+            await update.message.reply_text(get_message("failed_update", user_language).format(str(e)))
+        else:
+            await update.answer(get_message("failed_update", user_language).format(str(e)), show_alert=True)
+
+def generate_yesterday_message_text(stats, user_language):
+    if user_language == "ru":
+        message_text = "<b>Статистика за вчера:</b>\n\n"
+        message_text += f"🚿 <b>Помыто:</b> {stats['total_washed']}\n"
+        message_text += f"   • Обычная мойка: {stats['normal_wash']}\n"
+        message_text += f"   • Очистка от клея: {stats['additional_cleaning']}\n"
+        message_text += f"   • Легкая мойка: {stats['light_wash']}\n\n"
+        message_text += f"✨ <b>Отполировано:</b> {stats['total_polished']}\n"
+        message_text += f"   • 4+ деталей: {stats['full_polish']}\n"
+        message_text += f"   • 1-3 детали: {stats['half_polish']}\n\n"
+        message_text += f"💰 <b>Общая выручка:</b> {stats['revenue']} NIS"
+    elif user_language == "he":
+        message_text = "<b>סטטיסטיקה של אתמול:</b>\n\n"
+        message_text += f"🚿 <b>נשטפו:</b> {stats['total_washed']}\n"
+        message_text += f"   • שטיפה רגילה: {stats['normal_wash']}\n"
+        message_text += f"   • ניקוי דבק: {stats['additional_cleaning']}\n"
+        message_text += f"   • שטיפה קלה: {stats['light_wash']}\n\n"
+        message_text += f"✨ <b>הוברקו:</b> {stats['total_polished']}\n"
+        message_text += f"   • 4+ חלקים: {stats['full_polish']}\n"
+        message_text += f"   • 1-3 חלקים: {stats['half_polish']}\n\n"
+        message_text += f"💰 <b>סך ההכנסות:</b> {stats['revenue']} NIS"
+    else:  # Default to English
+        message_text = "<b>Yesterday's statistics:</b>\n\n"
+        message_text += f"🚿 <b>Washed:</b> {stats['total_washed']}\n"
+        message_text += f"   • Regular wash: {stats['normal_wash']}\n"
+        message_text += f"   • Glue cleaning: {stats['additional_cleaning']}\n"
+        message_text += f"   • Light wash: {stats['light_wash']}\n\n"
+        message_text += f"✨ <b>Polished:</b> {stats['total_polished']}\n"
+        message_text += f"   • 4+ parts: {stats['full_polish']}\n"
+        message_text += f"   • 1-3 parts: {stats['half_polish']}\n\n"
+        message_text += f"💰 <b>Total revenue:</b> {stats['revenue']} NIS"
+    return message_text
