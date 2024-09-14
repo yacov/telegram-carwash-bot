@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from database import init_airtable_tables
 from handlers import start_command, language_command, set_language_callback, send_update, handle_callback, send_yesterday_update
 from scheduler import schedule_daily_report
-
+from utils import is_user_admin
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
