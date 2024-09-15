@@ -1,5 +1,5 @@
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat, User
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from database import get_today_stats, get_yesterday_stats, get_worker_data, get_monthly_stats
@@ -15,17 +15,22 @@ logger = logging.getLogger(__name__)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    chat = update.effective_chat
     user_language = context.user_data.get('language', 'ru')
     message = get_message("welcome", user_language)
-    await update.message.reply_text(message, reply_markup=get_main_keyboard(user_language, user.username or ""))
+    keyboard = await get_main_keyboard(user_language, chat, user, context)
+    await update.message.reply_text(message, reply_markup=keyboard)
 
 async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_language = context.user_data.get('language', 'ru')
     message = get_message("select_language", user_language)
+    chat = update.effective_chat
+    user = update.effective_user
+    keyboard = await get_main_keyboard(user_language, chat, user, context)
     if update.message:
-        await update.message.reply_text(message, reply_markup=get_language_menu())
+        await update.message.reply_text(message, reply_markup=keyboard)
     elif update.callback_query:
-        await update.callback_query.edit_message_text(text=message, reply_markup=get_language_menu())
+        await update.callback_query.edit_message_text(text=message, reply_markup=keyboard)
 
 async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -41,8 +46,15 @@ async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TY
         context.bot_data['user_languages'] = {}
     context.bot_data['user_languages'][update.effective_user.id] = language
     
-    message = get_message("language_set", language)
-    await query.edit_message_text(text=message, reply_markup=get_main_keyboard(language, update.effective_user.username or ""))
+    message = get_message("language_set", language).format(LANGUAGES[language])
+    chat = update.effective_chat
+    user = update.effective_user
+    keyboard = await get_main_keyboard(language, chat, user, context)
+    await query.edit_message_text(
+        text=message, 
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML
+    )
 
 async def send_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
@@ -52,16 +64,20 @@ async def send_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         user_language = context.user_data.get('language', 'ru')
         message_text = generate_message_text(stats, current_time, user_language)
         
+        chat = update.effective_chat
+        user = update.effective_user
+        keyboard = await get_main_keyboard(user_language, chat, user, context)
+        
         if update.callback_query:
             await update.callback_query.edit_message_text(
                 text=message_text,
-                reply_markup=get_main_keyboard(user_language, update.effective_user.username or ""),
+                reply_markup=keyboard,
                 parse_mode=ParseMode.HTML
             )
         else:
             await update.message.reply_text(
                 text=message_text,
-                reply_markup=get_main_keyboard(user_language, update.effective_user.username or ""),
+                reply_markup=keyboard,
                 parse_mode=ParseMode.HTML
             )
     except Exception as e:
@@ -80,12 +96,16 @@ async def send_yesterday_update(update: Update, context: ContextTypes.DEFAULT_TY
         user_language = context.user_data.get('language', 'ru')
         message_text = generate_yesterday_message_text(stats, user_language)
 
+        chat = update.effective_chat
+        user = update.effective_user
+        keyboard = await get_main_keyboard(user_language, chat, user, context)
+
         if update.callback_query:
             # Check if the message content is different before editing
             if update.callback_query.message.text != message_text:
                 await update.callback_query.edit_message_text(
                     text=message_text,
-                    reply_markup=get_main_keyboard(user_language, update.effective_user.username or ""),
+                    reply_markup=keyboard,
                     parse_mode=ParseMode.HTML
                 )
             else:
@@ -93,7 +113,7 @@ async def send_yesterday_update(update: Update, context: ContextTypes.DEFAULT_TY
         else:
             await update.message.reply_text(
                 text=message_text,
-                reply_markup=get_main_keyboard(user_language, update.effective_user.username or ""),
+                reply_markup=keyboard,
                 parse_mode=ParseMode.HTML
             )
     except Exception as e:
@@ -116,10 +136,14 @@ async def send_monthly_update(update: Update, context: ContextTypes.DEFAULT_TYPE
         user_language = context.user_data.get('language', 'ru')
         message_text = generate_monthly_message_text(combined_stats, user_language)
 
+        chat = update.effective_chat
+        user = update.effective_user
+        keyboard = await get_main_keyboard(user_language, chat, user, context)
+
         await context.bot.send_message(
-            chat_id=update.effective_chat.id,
+            chat_id=chat.id,
             text=message_text,
-            reply_markup=get_main_keyboard(user_language, update.effective_user.username or ""),
+            reply_markup=keyboard,
             parse_mode=ParseMode.HTML
         )
     except Exception as e:
@@ -141,7 +165,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await send_monthly_update(update, context)
     elif query.data == "language":
         message = get_message("select_language", user_language)
-        await query.edit_message_text(text=message, reply_markup=get_language_menu())
+        await query.edit_message_text(
+            text=message, 
+            reply_markup=get_language_menu(),
+            parse_mode=ParseMode.HTML
+        )
 
 def generate_message_text(stats, current_time, user_language):
     if user_language == "ru":

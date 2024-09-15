@@ -1,5 +1,7 @@
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Chat, User
 from utils import is_user_admin
+from telegram.ext import ContextTypes
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -13,7 +15,7 @@ def get_language_menu():
     keyboard = [[InlineKeyboardButton(emoji, callback_data=f"set_language|{code}") for code, emoji in LANGUAGES.items()]]
     return InlineKeyboardMarkup(keyboard)
 
-def get_main_keyboard(user_language: str, username: str):
+async def get_main_keyboard(user_language: str, chat: Chat, user: User, context: ContextTypes.DEFAULT_TYPE):
     language_text = "🌐"
     cars_today_text = {
         "ru": "🚗 Сегодня",
@@ -40,7 +42,7 @@ def get_main_keyboard(user_language: str, username: str):
         ]
     ]
 
-    if is_user_admin(username):
+    if await is_user_admin(chat, user, context):
         keyboard[0].extend([
             InlineKeyboardButton(cars_yesterday_text, callback_data="cars_yesterday"),
             InlineKeyboardButton(cars_month_text, callback_data="cars_month")

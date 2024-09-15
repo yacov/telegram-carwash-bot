@@ -2,13 +2,27 @@ import os
 from dotenv import load_dotenv
 from message_constants import MESSAGES
 from datetime import date, timedelta
+from telegram import Chat, User, ChatMember
+from telegram.ext import ContextTypes
+import logging
+
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 # Load admin usernames from environment variable
 ADMIN_USERNAMES = [username.strip() for username in os.getenv('ADMIN_USERNAMES', '').split(',') if username.strip()]
 
-def is_user_admin(username: str) -> bool:
-    return username in ADMIN_USERNAMES
+async def is_user_admin(chat: Chat, user: User, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    if chat.type == Chat.PRIVATE:
+        return user.username in ADMIN_USERNAMES
+    
+    try:
+        member = await chat.get_member(user.id)
+        return member.status in [ChatMember.ADMINISTRATOR, ChatMember.OWNER]
+    except Exception as e:
+        logger.error(f"Error checking admin status: {e}")
+        return False
 
 def calculate_revenue(scans_records):
     """
