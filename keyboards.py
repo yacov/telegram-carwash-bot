@@ -14,26 +14,36 @@ def get_language_menu():
     return InlineKeyboardMarkup(keyboard)
 
 def get_main_keyboard(user_language: str, username: str):
-    language_text = "🌐"  # Globe icon for language selection
+    language_text = "🌐"
+    cars_today_text = {
+        "ru": "🚗 Сегодня",
+        "he": "🚗 היום",
+        "en": "🚗 Today"
+    }.get(user_language, "🚗 Today")
 
-    if user_language == "ru":
-        cars_today_text = "🚗 Сегодня"
-        cars_yesterday_text = "🚙 Вчера"
-    elif user_language == "he":
-        cars_today_text = "🚗 היום"
-        cars_yesterday_text = "🚙 אתמול"
-    else:  # Default to English
-        cars_today_text = "🚗 Today"
-        cars_yesterday_text = "🚙 Yesterday"
+    cars_yesterday_text = {
+        "ru": "🚙 Вчера",
+        "he": "🚙 אתמול",
+        "en": "🚙 Yesterday"
+    }.get(user_language, "🚙 Yesterday")
+
+    cars_month_text = {
+        "ru": "🚕 Этот месяц",
+        "he": "🚕 החודש",
+        "en": "🚕 This Month"
+    }.get(user_language, "🚕 This Month")
 
     keyboard = [
-        [InlineKeyboardButton(language_text, callback_data="language"),
-         InlineKeyboardButton(cars_today_text, callback_data="cars_today")]
+        [
+            InlineKeyboardButton(language_text, callback_data="language"),
+            InlineKeyboardButton(cars_today_text, callback_data="cars_today")
+        ]
     ]
 
-    # Add the "Yesterday" button only for admin users
     if is_user_admin(username):
-        keyboard[0].append(InlineKeyboardButton(cars_yesterday_text,
-                                                callback_data="cars_yesterday"))
+        keyboard[0].extend([
+            InlineKeyboardButton(cars_yesterday_text, callback_data="cars_yesterday"),
+            InlineKeyboardButton(cars_month_text, callback_data="cars_month")
+        ])
 
     return InlineKeyboardMarkup(keyboard)

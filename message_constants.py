@@ -6,7 +6,8 @@ MESSAGES = {
         "stats_up_to_date": "Статистика актуальна!",
         "failed_update": "Не удалось обновить: {}",
         "error_occurred": "Произошла ошибка: {}",
-        "cars_yesterday": "Машины вчера"
+        "cars_yesterday": "Машины вчера",
+        "stats_month": "Статистика за текущий месяц:"
     },
     "en": {
         "welcome": "Hello! I'm your car wash bot (v2.0). Choose an option:",
@@ -15,6 +16,7 @@ MESSAGES = {
         "stats_up_to_date": "Stats are up to date!",
         "failed_update": "Failed to update: {}",
         "error_occurred": "An error occurred: {}",
+        "stats_month": "Statistics for the current month:",
         "cars_yesterday": "Cars Yesterday"
     },
     "he": {
@@ -22,6 +24,7 @@ MESSAGES = {
         "language_set": "השפה הוגדרה ל{}. בחר אפשרות:",
         "select_language": "אנא בחר את השפה שלך:",
         "stats_up_to_date": "הסטטיסטיקה מעודכנת!",
+        "stats_month": "סטטיסטיקה של החודש הנוכחי:",
         "failed_update": "עדכון נכשל: {}",
         "error_occurred": "אירעה שגיאה: {}",
         "cars_yesterday": "מכוניות אתמול"

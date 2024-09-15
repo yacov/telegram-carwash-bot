@@ -2,14 +2,14 @@ import os
 from datetime import datetime, timedelta
 from airtable import Airtable
 from dotenv import load_dotenv
+from utils import calculate_revenue
 
 load_dotenv()
 
 AIRTABLE_API_KEY = os.environ.get('AIRTABLE_API_KEY')
 BASE_ID = os.environ.get('BASE_ID')
 
-
-__all__ = ['init_airtable_tables', 'get_today_stats', 'get_yesterday_stats', 'get_worker_data', 'update_worker_language', 'airtable_cache']
+__all__ = ['init_airtable_tables', 'get_today_stats', 'get_yesterday_stats', 'get_worker_data', 'update_worker_language']
 
 def init_airtable_tables():
     return {
@@ -29,37 +29,48 @@ async def get_today_stats(airtable_tables):
     cardryers_table = airtable_tables['cardryers']
     polish_table = airtable_tables['polish']
 
-    # Get scans (washes) for today
-    scans_formula = f"AND(IS_SAME({{Timestamp}}, '{today_str}', 'day'), IS_BEFORE({{Timestamp}}, '{tomorrow_str}'))"
-    scans = scans_table.get_all(formula=scans_formula)
-    
-    total_washed = len(scans)
-    normal_wash = sum(1 for scan in scans if not scan['fields'].get('CleanGlue') and not scan['fields'].get('ReturnCleaning'))
-    additional_cleaning = sum(1 for scan in scans if scan['fields'].get('CleanGlue') and not scan['fields'].get('ReturnCleaning'))
-    light_wash = sum(1 for scan in scans if not scan['fields'].get('CleanGlue') and scan['fields'].get('ReturnCleaning'))
+    scans_formula = f"AND(IS_AFTER({{Timestamp}}, '{today_str}'), IS_BEFORE({{Timestamp}}, '{tomorrow_str}'))"
+    scans_records = scans_table.get_all(formula=scans_formula)
 
-    # Get car drying jobs for today
-    dryers_formula = f"AND(IS_SAME({{Work Started}}, '{today_str}', 'day'), IS_BEFORE({{Work Started}}, '{tomorrow_str}'))"
+    polish_formula = f"AND(IS_AFTER({{Timestamp}}, '{today_str}'), IS_BEFORE({{Timestamp}}, '{tomorrow_str}'))"
+    polish_records = polish_table.get_all(formula=polish_formula)
+
+    dryers_formula = f"AND(IS_AFTER({{Work Started}}, '{today_str}'), IS_BEFORE({{Work Started}}, '{tomorrow_str}'))"
     dryed = cardryers_table.get_all(formula=dryers_formula)
-    total_dryed = len(dryed)
 
-    # Get polishing jobs for today
-    polish_formula = f"AND(IS_SAME({{Timestamp}}, '{today_str}', 'day'), IS_BEFORE({{Timestamp}}, '{tomorrow_str}'))"
-    polished = polish_table.get_all(formula=polish_formula)
-    total_polished = len(polished)
-    full_polish = sum(1 for polish in polished if polish['fields'].get('Services') == 'FullPolish')
-    half_polish = sum(1 for polish in polished if polish['fields'].get('Services') == 'HalfPolish')
+    total_washed = len(scans_records)
+    normal_wash = sum(1 for scan in scans_records if not scan['fields'].get('CleanGlue') and not scan['fields'].get('ReturnCleaning'))
+    additional_cleaning = sum(1 for scan in scans_records if scan['fields'].get('CleanGlue') and not scan['fields'].get('ReturnCleaning'))
+    light_wash = sum(1 for scan in scans_records if not scan['fields'].get('CleanGlue') and scan['fields'].get('ReturnCleaning'))
+
+    total_polished = len(polish_records)
+    full_polish = sum(1 for polish in polish_records if polish['fields'].get('Services') == 'FullPolish')
+    half_polish = sum(1 for polish in polish_records if polish['fields'].get('Services') == 'HalfPolish')
+    shlaif = sum(1 for polish in polish_records if polish['fields'].get('Services') == 'Shlaif')
+
+    wash_revenue = calculate_revenue(scans_records)
+    polish_revenue = sum(
+        145 if polish['fields'].get('Services') == 'FullPolish' else
+        75 if polish['fields'].get('Services') == 'HalfPolish' else
+        50 for polish in polish_records
+    )
+    total_revenue = wash_revenue + polish_revenue
 
     return {
         'total_washed': total_washed,
         'normal_wash': normal_wash,
         'additional_cleaning': additional_cleaning,
         'light_wash': light_wash,
-        'total_dryed': total_dryed,
         'total_polished': total_polished,
         'full_polish': full_polish,
-        'half_polish': half_polish
+        'half_polish': half_polish,
+        'shlaif': shlaif,
+        'wash_revenue': wash_revenue,
+        'polish_revenue': polish_revenue,
+        'total_revenue': total_revenue,
+        'total_dryed': len(dryed),
     }
+
 async def get_yesterday_stats(airtable_tables):
     yesterday = (datetime.now() - timedelta(days=1)).date()
     day_before_yesterday = yesterday - timedelta(days=1)
@@ -67,32 +78,27 @@ async def get_yesterday_stats(airtable_tables):
     day_before_yesterday_str = day_before_yesterday.isoformat()
 
     scans_table = airtable_tables['scans']
-    cardryers_table = airtable_tables['cardryers']
     polish_table = airtable_tables['polish']
 
-    # Get scans (washes) for yesterday
-    scans_formula = f"AND(IS_SAME({{Timestamp}}, '{yesterday_str}', 'day'), IS_AFTER({{Timestamp}}, '{day_before_yesterday_str}'))"
+    scans_formula = f"AND(IS_AFTER({{Timestamp}}, '{yesterday_str}'), IS_BEFORE({{Timestamp}}, '{day_before_yesterday_str}'))"
     scans = scans_table.get_all(formula=scans_formula)
-    
+
+    polish_formula = f"AND(IS_AFTER({{Timestamp}}, '{yesterday_str}'), IS_BEFORE({{Timestamp}}, '{day_before_yesterday_str}'))"
+    polished = polish_table.get_all(formula=polish_formula)
+
     total_washed = len(scans)
     normal_wash = sum(1 for scan in scans if not scan['fields'].get('CleanGlue') and not scan['fields'].get('ReturnCleaning'))
     additional_cleaning = sum(1 for scan in scans if scan['fields'].get('CleanGlue') and not scan['fields'].get('ReturnCleaning'))
     light_wash = sum(1 for scan in scans if not scan['fields'].get('CleanGlue') and scan['fields'].get('ReturnCleaning'))
 
-    # Get polishing jobs for yesterday
-    polish_formula = f"AND(IS_SAME({{Timestamp}}, '{yesterday_str}', 'day'), IS_AFTER({{Timestamp}}, '{day_before_yesterday_str}'))"
-    polished = polish_table.get_all(formula=polish_formula)
     total_polished = len(polished)
     full_polish = sum(1 for polish in polished if polish['fields'].get('Services') == 'FullPolish')
     half_polish = sum(1 for polish in polished if polish['fields'].get('Services') == 'HalfPolish')
 
-    # Calculate revenue
-    revenue = (
-        normal_wash * 70 +
-        additional_cleaning * 75 +
-        light_wash * 50 +
-        full_polish * 300 +
-        half_polish * 150
+    revenue = calculate_revenue(scans) + sum(
+        145 if polish['fields'].get('Services') == 'FullPolish' else
+        75 if polish['fields'].get('Services') == 'HalfPolish' else
+        50 for polish in polished
     )
 
     return {
@@ -108,11 +114,14 @@ async def get_yesterday_stats(airtable_tables):
 
 async def get_worker_data(workers_table, user_id: int) -> dict:
     worker = workers_table.search('TelegramID', str(user_id))
-    if worker:
-        return worker[0]['fields']
-    return None
+    return worker[0]['fields'] if worker else None
 
 async def update_worker_language(workers_table, user_id: int, language: str):
     worker = workers_table.search('TelegramID', str(user_id))
     if worker:
         workers_table.update(worker[0]['id'], {'Language': language})
+
+async def get_monthly_stats(airtable_tables):
+    from cache import monthly_stats_cache
+    return await monthly_stats_cache.get_stats(airtable_tables)
+
