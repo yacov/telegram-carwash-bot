@@ -50,9 +50,10 @@ async def get_today_stats(airtable_tables):
 
     wash_revenue = calculate_revenue(scans_records)
     polish_revenue = sum(
-        145 if polish['fields'].get('Services') == 'FullPolish' else
-        75 if polish['fields'].get('Services') == 'HalfPolish' else
-        50 for polish in polish_records
+        350 if polish['fields'].get('Services') == 'FullPolish' else
+        150 if polish['fields'].get('Services') == 'HalfPolish' else
+        1000 if polish['fields'].get('Services') == 'Shlaif' else
+        0 for polish in polish_records
     )
     total_revenue = wash_revenue + polish_revenue
 
@@ -94,11 +95,13 @@ async def get_yesterday_stats(airtable_tables):
     total_polished = len(polished)
     full_polish = sum(1 for polish in polished if polish['fields'].get('Services') == 'FullPolish')
     half_polish = sum(1 for polish in polished if polish['fields'].get('Services') == 'HalfPolish')
+    shlaif = sum(1 for polish in polished if polish['fields'].get('Services') == 'Shlaif')
 
     revenue = calculate_revenue(scans) + sum(
         145 if polish['fields'].get('Services') == 'FullPolish' else
         75 if polish['fields'].get('Services') == 'HalfPolish' else
-        50 for polish in polished
+        1000 if polish['fields'].get('Services') == 'Shlaif' else
+        0 for polish in polished
     )
 
     return {
@@ -109,6 +112,7 @@ async def get_yesterday_stats(airtable_tables):
         'total_polished': total_polished,
         'full_polish': full_polish,
         'half_polish': half_polish,
+        'shlaif': shlaif,
         'revenue': revenue
     }
 

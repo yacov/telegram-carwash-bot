@@ -181,6 +181,7 @@ def generate_message_text(stats, current_time, user_language):
         message_text += f"✨ <b>Отполировано:</b> {stats['total_polished']}\n"
         message_text += f"   • 4+ деталей: {stats['full_polish']}\n"
         message_text += f"   • 1-3 детали: {stats['half_polish']}\n"
+        message_text += f"   • Шлифовка: {stats['shlaif']}\n"
     elif user_language == "he":
         message_text = f"<b>סטטיסטיקה נכון ל-{current_time}:</b>\n\n"
         message_text += f"🚿 <b>נשטפו:</b> {stats['total_washed']}\n"
@@ -190,6 +191,7 @@ def generate_message_text(stats, current_time, user_language):
         message_text += f"✨ <b>הוברקו:</b> {stats['total_polished']}\n"
         message_text += f"   • 4+ חלקים: {stats['full_polish']}\n"
         message_text += f"   • 1-3 חלקים: {stats['half_polish']}\n"
+        message_text += f"   • שלייף: {stats['shlaif']}\n"
     else:  # Default to English
         message_text = f"<b>Statistics as of {current_time}:</b>\n\n"
         message_text += f"🚿 <b>Washed:</b> {stats['total_washed']}\n"
@@ -199,6 +201,7 @@ def generate_message_text(stats, current_time, user_language):
         message_text += f"✨ <b>Polished:</b> {stats['total_polished']}\n"
         message_text += f"   • 4+ parts: {stats['full_polish']}\n"
         message_text += f"   • 1-3 parts: {stats['half_polish']}\n"
+        message_text += f"   • Shlaif: {stats['shlaif']}\n"
     return message_text
 
 
@@ -212,6 +215,7 @@ def generate_yesterday_message_text(stats, user_language):
         message_text += f"✨ <b>Отполировано:</b> {stats['total_polished']}\n"
         message_text += f"   • 4+ деталей: {stats['full_polish']}\n"
         message_text += f"   • 1-3 детали: {stats['half_polish']}\n"
+        message_text += f"   • Шлифовка: {stats['shlaif']}\n"
         message_text += f"\n💰 <b>Общая выручка:</b> {stats['revenue']} NIS"
     elif user_language == "he":
         message_text = "<b>סטטיסטיקה של אתמול:</b>\n\n"
@@ -222,6 +226,7 @@ def generate_yesterday_message_text(stats, user_language):
         message_text += f"✨ <b>הוברקו:</b> {stats['total_polished']}\n"
         message_text += f"   • 4+ חלקים: {stats['full_polish']}\n"
         message_text += f"   • 1-3 חלקים: {stats['half_polish']}\n"
+        message_text += f"   • שלייף: {stats['shlaif']}\n"
         message_text += f"\n💰 <b>סך ההכנסות:</b> {stats['revenue']} NIS"
     else:  # Default to English
         message_text = "<b>Yesterday's statistics:</b>\n\n"
@@ -232,6 +237,7 @@ def generate_yesterday_message_text(stats, user_language):
         message_text += f"✨ <b>Polished:</b> {stats['total_polished']}\n"
         message_text += f"   • 4+ parts: {stats['full_polish']}\n"
         message_text += f"   • 1-3 parts: {stats['half_polish']}\n"
+        message_text += f"   • Shlaif: {stats['shlaif']}\n"
         message_text += f"\n💰 <b>Total revenue:</b> {stats['revenue']} NIS"
     return message_text
 
