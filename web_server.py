@@ -17,9 +17,9 @@ app = Flask(__name__)
 
 # Initialize bot
 bot_instance = Bot(
-    token="6860364776:AAEF-X-aFT__wy3KffYstEVQnIfi-QIrdLU",
+    token=os.getenv('BOT_TOKEN'),
     chat_id=os.getenv('CHAT_ID'),
-    webhook_url="https://curvy-steaks-stand.loca.lt/webhook"
+    webhook_url=os.getenv('WEBHOOK_URL')
 )
 
 @app.route('/', methods=['GET'])
