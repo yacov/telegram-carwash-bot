@@ -17,9 +17,9 @@ app = Flask(__name__)
 
 # Initialize bot
 bot_instance = Bot(
-    token=os.getenv('BOT_TOKEN'),
+    token="6860364776:AAEF-X-aFT__wy3KffYstEVQnIfi-QIrdLU",
     chat_id=os.getenv('CHAT_ID'),
-    webhook_url=os.getenv('WEBHOOK_URL')
+    webhook_url="https://lubinskybot-7a6538f13148.herokuapp.com/webhook"
 )
 
 @app.route('/', methods=['GET'])
