@@ -4,3 +4,4 @@ airtable-python-wrapper
 apscheduler
 python-dotenv
 quart
+hypercorn

@@ -1,7 +1,7 @@
 import os
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, TypeHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
 from datetime import time
 import asyncio
@@ -63,6 +63,9 @@ class Bot:
         self.is_initialized = True
 
     async def process_update(self, update: Update):
+        if not self.is_initialized:
+            logger.error("Bot is not initialized yet")
+            return
         await self.application.process_update(update)
 
     async def pre_process_update(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -24,6 +24,10 @@ bot_instance = Bot(
     webhook_url="https://lubinskybot-7a6538f13148.herokuapp.com/webhook"
 )
 
+@app.before_serving
+async def startup():
+    await bot_instance.start()
+
 @app.route('/', methods=['GET'])
 async def home():
     return "Bot is running!"
@@ -32,19 +36,14 @@ async def home():
 async def webhook():
     logger.info("Received webhook call")
     if request.headers.get('content-type') == 'application/json':
-        update = Update.de_json(await request.get_json(), bot_instance.application.bot)
+        json_data = await request.get_json()
+        update = Update.de_json(json_data, bot_instance.application.bot)
         logger.info(f"Received update: {update}")
         await bot_instance.process_update(update)
         return jsonify({"status": "success"}), 200
     else:
         return jsonify({"status": "error", "message": "Invalid content type"}), 400
 
-async def run_bot():
-    await bot_instance.start()
-
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    # Run the bot setup asynchronously
-    asyncio.run(run_bot())
-    # Run the Quart app
     app.run(host='0.0.0.0', port=port)
