@@ -4,6 +4,8 @@ import asyncio
 from bot import Bot
 from dotenv import load_dotenv
 import logging
+from telegram import Update
+from telegram.ext import Application
 
 # Configure logging
 logging.basicConfig(
@@ -28,18 +30,21 @@ def home():
     return "Bot is running!"
 
 @app.route('/webhook', methods=['POST'])
-def webhook():
+async def webhook():
     logger.info("Received webhook call")
     if request.headers.get('content-type') == 'application/json':
-        update = request.get_json()
+        update = Update.de_json(request.get_json(), bot_instance.application.bot)
         logger.info(f"Received update: {update}")
-        asyncio.run(bot_instance.process_update(update))
+        await bot_instance.application.process_update(update)
         return jsonify({"status": "success"}), 200
     else:
         return jsonify({"status": "error", "message": "Invalid content type"}), 400
 
 async def init_bot():
     await bot_instance.start()
+    await bot_instance.application.initialize()
+    await bot_instance.application.start()
+    await bot_instance.application.updater.start_polling()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

@@ -76,16 +76,5 @@ class Bot:
         if isinstance(update, Update) and update.effective_message:
             await update.effective_message.reply_text("An error occurred. Please try again later.")
 
-    async def process_update(self, update_data):
-        if not self.is_initialized:
-            logger.error("Attempted to process update before bot was initialized")
-            return
-
-        try:
-            await asyncio.wait_for(
-                self.application.process_update(Update.de_json(update_data, self.application.bot)),
-                timeout=10  # Adjust this value as needed
-            )
-        except asyncio.TimeoutError:
-            logger.error("Update processing timed out")
+    # Remove the process_update method as it's no longer needed
 
