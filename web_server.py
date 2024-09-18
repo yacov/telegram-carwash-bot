@@ -4,6 +4,7 @@ import asyncio
 from bot import Bot
 from dotenv import load_dotenv
 import logging
+
 # Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -37,10 +38,10 @@ def webhook():
     else:
         return jsonify({"status": "error", "message": "Invalid content type"}), 400
 
-def init_bot():
-    asyncio.run(bot_instance.start())
+async def init_bot():
+    await bot_instance.start()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    init_bot()
+    asyncio.run(init_bot())
     app.run(host='0.0.0.0', port=port)
