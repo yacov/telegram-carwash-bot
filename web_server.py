@@ -1,11 +1,10 @@
-from flask import Flask, request, jsonify
+from quart import Quart, request, jsonify
 import os
 import asyncio
 from bot import Bot
 from dotenv import load_dotenv
 import logging
 from telegram import Update
-from telegram.ext import Application
 
 # Configure logging
 logging.basicConfig(
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Quart(__name__)
 
 # Initialize bot
 bot_instance = Bot(
@@ -26,24 +25,26 @@ bot_instance = Bot(
 )
 
 @app.route('/', methods=['GET'])
-def home():
+async def home():
     return "Bot is running!"
 
 @app.route('/webhook', methods=['POST'])
-def webhook():
+async def webhook():
     logger.info("Received webhook call")
     if request.headers.get('content-type') == 'application/json':
-        update = Update.de_json(request.get_json(), bot_instance.application.bot)
+        update = Update.de_json(await request.get_json(), bot_instance.application.bot)
         logger.info(f"Received update: {update}")
-        asyncio.run(bot_instance.process_update(update))
+        await bot_instance.process_update(update)
         return jsonify({"status": "success"}), 200
     else:
         return jsonify({"status": "error", "message": "Invalid content type"}), 400
 
-def run_bot():
-    asyncio.run(bot_instance.start())
+async def run_bot():
+    await bot_instance.start()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    run_bot()
+    # Run the bot setup asynchronously
+    asyncio.run(run_bot())
+    # Run the Quart app
     app.run(host='0.0.0.0', port=port)

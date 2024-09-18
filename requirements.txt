@@ -1,6 +1,6 @@
-python-telegram-bot==21.5
+python-telegram-bot
 tgcrypto
 airtable-python-wrapper
 apscheduler
 python-dotenv
-flask[async]
+quart
