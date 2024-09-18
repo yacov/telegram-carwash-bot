@@ -4,15 +4,15 @@ from utils import calculate_revenue, get_workdays_in_period
 
 class MonthlyStatsCache:
     def __init__(self):
-        self.cache = None
-        self.last_updated = None
+        self._cache = {}
+        self._last_update = None
 
     async def get_stats(self, airtable_tables, force_refresh=False):
-        now = datetime.now()
-        if force_refresh or self.cache is None or self.last_updated.date() < now.date():
-            self.cache = await self.get_monthly_stats_raw(airtable_tables)
-            self.last_updated = now
-        return self.cache
+        current_date = datetime.now().date()
+        if force_refresh or self._last_update != current_date:
+            self._cache = await self.get_monthly_stats_raw(airtable_tables)
+            self._last_update = current_date
+        return self._cache
 
     async def update_daily(self, context):
         airtable_tables = context.job.data['airtable_tables']

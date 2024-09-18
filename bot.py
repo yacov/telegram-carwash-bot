@@ -1,11 +1,10 @@
 import os
 import logging
-import asyncio
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, TypeHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, TypeHandler
 from dotenv import load_dotenv
 from datetime import time
-
+import asyncio
 from database import init_airtable_tables
 from handlers import start_command, language_command, set_language_callback, send_update, handle_callback, send_yesterday_update, send_monthly_update
 from scheduler import schedule_daily_report
@@ -15,18 +14,18 @@ from cache import MonthlyStatsCache
 # Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.DEBUG
 )
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 class Bot:
-    def __init__(self, token, chat_id):
+    def __init__(self, token, chat_id, webhook_url):
         self.token = token
         self.chat_id = chat_id
-        self.application = None
-        self.airtable_tables = None 
+        self.webhook_url = webhook_url
+        self.application = Application.builder().token(self.token).build()
         self.monthly_stats_cache = MonthlyStatsCache()
     
     async def initialize_cache(self):
@@ -37,47 +36,26 @@ class Bot:
             data={'airtable_tables': self.airtable_tables}
         )
 
-    def start(self):
-        try:
-            self.application = (
-                ApplicationBuilder()
-                .token(self.token)
-                .build()
-            )
+    async def start(self):
+        # Add handlers
+        self.application.add_handler(CommandHandler("start", start_command))
+        self.application.add_handler(CommandHandler("language", language_command))
+        self.application.add_handler(CallbackQueryHandler(set_language_callback, pattern="^set_language"))
+        self.application.add_handler(CallbackQueryHandler(handle_callback))
+        self.application.add_handler(CommandHandler("cars", send_update))
+        self.application.add_handler(CommandHandler("yesterday", send_yesterday_update))
+        self.application.add_handler(CallbackQueryHandler(send_yesterday_update, pattern="^cars_yesterday$"))
+        self.application.add_handler(CommandHandler("month", send_monthly_update))
 
-            self.airtable_tables = init_airtable_tables()
-            self.application.bot_data['airtable_tables'] = self.airtable_tables
-            logger.info("Airtable tables initialized and stored in bot_data")
+        # Initialize other components
+        self.airtable_tables = init_airtable_tables()
+        self.application.bot_data['airtable_tables'] = self.airtable_tables
+        await self.initialize_cache()
+        schedule_daily_report(self.application, self.chat_id)
 
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(self.initialize_cache())
-            logger.info("Monthly stats cache initialized")
-
-            # Add handlers
-            self.application.add_handler(TypeHandler(Update, self.pre_process_update), group=-1)
-            self.application.add_handler(CommandHandler("start", start_command))
-            self.application.add_handler(CommandHandler("language", language_command))
-            self.application.add_handler(CallbackQueryHandler(set_language_callback, pattern="^set_language"))
-            self.application.add_handler(CallbackQueryHandler(handle_callback))
-            self.application.add_handler(CommandHandler("cars", send_update))
-            self.application.add_handler(CommandHandler("yesterday", send_yesterday_update))
-            self.application.add_handler(CallbackQueryHandler(send_yesterday_update, pattern="^cars_yesterday$"))
-            self.application.add_handler(CommandHandler("month", send_monthly_update))
-            self.application.bot_data['monthly_stats_cache'] = self.monthly_stats_cache
-
-            # Add error handler
-            self.application.add_error_handler(self.error_handler)
-
-            # Schedule daily report
-            schedule_daily_report(self.application, self.chat_id)
-
-            logger.info("Bot started. Press Ctrl+C to stop.")
-            
-            # Start the bot using run_polling
-            self.application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-        except Exception as e:
-            logger.error(f"Failed to run the bot: {e}", exc_info=True)
+        # Set up webhook
+        await self.application.bot.set_webhook(url=self.webhook_url)
+        logger.info(f"Webhook set to: {self.webhook_url}")
 
     async def pre_process_update(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Pre-process all updates before they reach other handlers."""
@@ -87,21 +65,18 @@ class Bot:
                 context.user_data['language'] = context.bot_data['user_languages'][user_id]
             else:
                 context.user_data['language'] = context.user_data.get('language', 'ru')
-        # Add more pre-processing logic as needed
 
     async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.error("Exception while handling an update:", exc_info=context.error)
         if isinstance(update, Update) and update.effective_message:
             await update.effective_message.reply_text("An error occurred. Please try again later.")
 
-def main():
-    bot = Bot(token="6860364776:AAEF-X-aFT__wy3KffYstEVQnIfi-QIrdLU", chat_id=os.getenv('CHAT_ID'))
-    bot.start()
+    async def process_update(self, update_data):
+        try:
+            await asyncio.wait_for(
+                self.application.process_update(Update.de_json(update_data, self.application.bot)),
+                timeout=10  # Adjust this value as needed
+            )
+        except asyncio.TimeoutError:
+            logger.error("Update processing timed out")
 
-if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        logger.info("Bot stopped manually.")
-    except Exception as e:
-        logger.exception(f"Unhandled exception: {e}")

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from airtable import Airtable
 from dotenv import load_dotenv
 from utils import calculate_revenue
+from cache import monthly_stats_cache
 
 load_dotenv()
 
@@ -126,6 +127,5 @@ async def update_worker_language(workers_table, user_id: int, language: str):
         workers_table.update(worker[0]['id'], {'Language': language})
 
 async def get_monthly_stats(airtable_tables):
-    from cache import monthly_stats_cache
     return await monthly_stats_cache.get_stats(airtable_tables)
 

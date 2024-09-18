@@ -93,9 +93,10 @@ async def send_yesterday_update(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         airtable_tables = context.bot_data.get('airtable_tables', {})
         stats = await get_yesterday_stats(airtable_tables)
+        logger.info(f"Yesterday stats: {stats}")
         user_language = context.user_data.get('language', 'ru')
         message_text = generate_yesterday_message_text(stats, user_language)
-
+        logger.info(f"Generated message: {message_text}")
         chat = update.effective_chat
         user = update.effective_user
         keyboard = await get_main_keyboard(user_language, chat, user, context)
@@ -129,12 +130,14 @@ async def send_monthly_update(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         airtable_tables = context.bot_data.get('airtable_tables', {})
         monthly_stats_cache = context.bot_data.get('monthly_stats_cache')
-        cached_stats = await monthly_stats_cache.get_stats(airtable_tables)
-        today_stats = await get_today_stats(airtable_tables)
-        combined_stats = combine_stats(cached_stats, today_stats)
-
+        
+        if monthly_stats_cache:
+            stats = await monthly_stats_cache.get_stats(airtable_tables)
+        else:
+            stats = await get_monthly_stats(airtable_tables)
+        
         user_language = context.user_data.get('language', 'ru')
-        message_text = generate_monthly_message_text(combined_stats, user_language)
+        message_text = generate_monthly_message_text(stats, user_language)
 
         chat = update.effective_chat
         user = update.effective_user
