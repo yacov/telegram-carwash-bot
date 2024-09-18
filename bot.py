@@ -62,6 +62,9 @@ class Bot:
         await self.application.initialize()
         self.is_initialized = True
 
+    async def process_update(self, update: Update):
+        await self.application.process_update(update)
+
     async def pre_process_update(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Pre-process all updates before they reach other handlers."""
         if update.effective_user:
@@ -75,6 +78,4 @@ class Bot:
         logger.error("Exception while handling an update:", exc_info=context.error)
         if isinstance(update, Update) and update.effective_message:
             await update.effective_message.reply_text("An error occurred. Please try again later.")
-
-    # Remove the process_update method as it's no longer needed
 

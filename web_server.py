@@ -30,23 +30,20 @@ def home():
     return "Bot is running!"
 
 @app.route('/webhook', methods=['POST'])
-async def webhook():
+def webhook():
     logger.info("Received webhook call")
     if request.headers.get('content-type') == 'application/json':
         update = Update.de_json(request.get_json(), bot_instance.application.bot)
         logger.info(f"Received update: {update}")
-        await bot_instance.application.process_update(update)
+        asyncio.run(bot_instance.process_update(update))
         return jsonify({"status": "success"}), 200
     else:
         return jsonify({"status": "error", "message": "Invalid content type"}), 400
 
-async def init_bot():
-    await bot_instance.start()
-    await bot_instance.application.initialize()
-    await bot_instance.application.start()
-    await bot_instance.application.updater.start_polling()
+def run_bot():
+    asyncio.run(bot_instance.start())
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    asyncio.run(init_bot())
+    run_bot()
     app.run(host='0.0.0.0', port=port)
