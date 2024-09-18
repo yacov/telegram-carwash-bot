@@ -75,17 +75,19 @@ async def get_today_stats(airtable_tables):
 
 async def get_yesterday_stats(airtable_tables):
     yesterday = (datetime.now() - timedelta(days=1)).date()
+    today = datetime.now().date()
     day_before_yesterday = yesterday - timedelta(days=1)
     yesterday_str = yesterday.isoformat()
+    today_str = today.isoformat()
     day_before_yesterday_str = day_before_yesterday.isoformat()
 
     scans_table = airtable_tables['scans']
     polish_table = airtable_tables['polish']
 
-    scans_formula = f"AND(IS_AFTER({{Timestamp}}, '{yesterday_str}'), IS_BEFORE({{Timestamp}}, '{day_before_yesterday_str}'))"
+    scans_formula = f"AND(IS_AFTER({{Timestamp}}, '{yesterday_str}'), IS_BEFORE({{Timestamp}}, '{today_str}'))"
     scans = scans_table.get_all(formula=scans_formula)
 
-    polish_formula = f"AND(IS_AFTER({{Timestamp}}, '{yesterday_str}'), IS_BEFORE({{Timestamp}}, '{day_before_yesterday_str}'))"
+    polish_formula = f"AND(IS_AFTER({{Timestamp}}, '{yesterday_str}'), IS_BEFORE({{Timestamp}}, '{today_str}'))"
     polished = polish_table.get_all(formula=polish_formula)
 
     total_washed = len(scans)
