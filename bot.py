@@ -38,7 +38,7 @@ class Bot:
 
     async def start(self):
         # Add handlers
-        self.application.add_handler(CommandHandler("start", start_command))
+        self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("language", language_command))
         self.application.add_handler(CallbackQueryHandler(set_language_callback, pattern="^set_language"))
         self.application.add_handler(CallbackQueryHandler(handle_callback))
@@ -55,6 +55,8 @@ class Bot:
 
         # Set up webhook
         await self.application.bot.set_webhook(url=self.webhook_url)
+        await self.application.initialize()  # Add this line
+        await self.application.start()  # Add this line
         logger.info(f"Webhook set to: {self.webhook_url}")
 
     async def pre_process_update(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

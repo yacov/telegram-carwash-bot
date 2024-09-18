@@ -27,30 +27,20 @@ def home():
     return "Bot is running!"
 
 @app.route('/webhook', methods=['POST'])
-def webhook():
+async def webhook():
     logger.info("Received webhook call")
-    try:
-        if request.headers.get('content-type') == 'application/json':
-            json_string = request.get_data().decode('utf-8')
-            update = request.get_json()
-            logger.info(f"Received update: {update}")
-            asyncio.run(bot_instance.process_update(update))
-            return 'ok', 200
-        else:
-            logger.warning("Received non-JSON content")
-            return 'Error: expected JSON data', 400
-    except Exception as e:
-        logger.error(f"Error processing update: {str(e)}")
-        return 'Error processing update', 500
+    if request.headers.get('content-type') == 'application/json':
+        update = request.get_json()
+        logger.info(f"Received update: {update}")
+        await bot_instance.process_update(update)
+        return jsonify({"status": "success"}), 200
+    else:
+        return jsonify({"status": "error", "message": "Invalid content type"}), 400
 
 async def init_bot():
     await bot_instance.start()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    
-    # Initialize bot before starting the Flask server
     asyncio.run(init_bot())
-    
-    # Start Flask server
     app.run(host='0.0.0.0', port=port)
