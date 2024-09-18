@@ -9,7 +9,7 @@ from database import init_airtable_tables
 from handlers import start_command, language_command, set_language_callback, send_update, handle_callback, send_yesterday_update, send_monthly_update
 from scheduler import schedule_daily_report
 from utils import is_user_admin
-from cache import MonthlyStatsCache 
+from cache import MonthlyStatsCache
 
 # Configure logging
 logging.basicConfig(
@@ -27,7 +27,7 @@ class Bot:
         self.webhook_url = webhook_url
         self.application = Application.builder().token(self.token).build()
         self.monthly_stats_cache = MonthlyStatsCache()
-    
+
     async def initialize_cache(self):
         await self.monthly_stats_cache.get_stats(self.airtable_tables, force_refresh=True)
         self.application.job_queue.run_daily(
@@ -38,7 +38,7 @@ class Bot:
 
     async def start(self):
         # Add handlers
-        self.application.add_handler(CommandHandler("start", self.start_command))
+        self.application.add_handler(CommandHandler("start", start_command))
         self.application.add_handler(CommandHandler("language", language_command))
         self.application.add_handler(CallbackQueryHandler(set_language_callback, pattern="^set_language"))
         self.application.add_handler(CallbackQueryHandler(handle_callback))
@@ -55,8 +55,6 @@ class Bot:
 
         # Set up webhook
         await self.application.bot.set_webhook(url=self.webhook_url)
-        await self.application.initialize()  # Add this line
-        await self.application.start()  # Add this line
         logger.info(f"Webhook set to: {self.webhook_url}")
 
     async def pre_process_update(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
