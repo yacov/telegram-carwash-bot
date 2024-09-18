@@ -3,4 +3,4 @@ tgcrypto
 airtable-python-wrapper
 apscheduler
 python-dotenv
-flask==3.0.3
+flask[async]

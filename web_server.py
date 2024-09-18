@@ -30,7 +30,7 @@ def home():
 async def webhook():
     logger.info("Received webhook call")
     if request.headers.get('content-type') == 'application/json':
-        update = request.get_json()
+        update = await request.get_json()
         logger.info(f"Received update: {update}")
         await bot_instance.process_update(update)
         return jsonify({"status": "success"}), 200
