@@ -1,10 +1,11 @@
-from quart import Quart, request, jsonify
-import os
-import asyncio
-from bot import Bot
-from dotenv import load_dotenv
 import logging
+import os
+
+from dotenv import load_dotenv
+from quart import Quart, request, jsonify
 from telegram import Update
+
+from bot import Bot
 
 # Configure logging
 logging.basicConfig(
