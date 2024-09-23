@@ -10,7 +10,7 @@ load_dotenv()
 AIRTABLE_API_KEY = os.environ.get('AIRTABLE_API_KEY')
 BASE_ID = os.environ.get('BASE_ID')
 
-__all__ = ['init_airtable_tables', 'get_today_stats', 'get_yesterday_stats', 'get_worker_data', 'update_worker_language']
+__all__ = ['init_airtable_tables', 'get_today_stats', 'get_yesterday_stats', 'get_monthly_stats','get_worker_data', 'update_worker_language']
 
 def init_airtable_tables():
     return {

@@ -23,18 +23,6 @@ async def get_main_keyboard(user_language: str, chat: Chat, user: User, context:
         "en": "🚗 Today"
     }.get(user_language, "🚗 Today")
 
-    cars_yesterday_text = {
-        "ru": "🚙 Вчера",
-        "he": "🚙 אתמול",
-        "en": "🚙 Yesterday"
-    }.get(user_language, "🚙 Yesterday")
-
-    cars_month_text = {
-        "ru": "🚕 Этот месяц",
-        "he": "🚕 החודש",
-        "en": "🚕 This Month"
-    }.get(user_language, "🚕 This Month")
-
     keyboard = [
         [
             InlineKeyboardButton(language_text, callback_data="language"),
@@ -43,6 +31,18 @@ async def get_main_keyboard(user_language: str, chat: Chat, user: User, context:
     ]
 
     if await is_user_admin(chat, user, context):
+        cars_yesterday_text = {
+            "ru": "🚙 Вчера",
+            "he": "🚙 אתמול",
+            "en": "🚙 Yesterday"
+        }.get(user_language, "🚙 Yesterday")
+
+        cars_month_text = {
+            "ru": "🚕 Месяц",
+            "he": "🚕 חודש",
+            "en": "🚕 Month"
+        }.get(user_language, "🚕 Month")
+
         keyboard[0].extend([
             InlineKeyboardButton(cars_yesterday_text, callback_data="cars_yesterday"),
             InlineKeyboardButton(cars_month_text, callback_data="cars_month")

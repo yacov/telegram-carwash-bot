@@ -1,15 +1,17 @@
-import os
 import logging
-from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
-from dotenv import load_dotenv
 from datetime import time
-import asyncio
-from database import init_airtable_tables
-from handlers import start_command, language_command, set_language_callback, send_update, handle_callback, send_yesterday_update, send_monthly_update
-from scheduler import schedule_daily_report
-from utils import is_user_admin
+from zoneinfo import ZoneInfo
+
+from dotenv import load_dotenv
+from telegram import Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, \
+    ContextTypes
+
 from cache import MonthlyStatsCache
+from database import init_airtable_tables
+from handlers import start_command, language_command, set_language_callback, \
+    send_update, handle_callback, send_yesterday_update, send_monthly_update
+from scheduler import schedule_daily_report
 
 # Configure logging
 logging.basicConfig(
@@ -22,6 +24,7 @@ load_dotenv()
 
 class Bot:
     def __init__(self, token, chat_id, webhook_url):
+        self.airtable_tables = init_airtable_tables()
         self.token = token
         self.chat_id = chat_id
         self.webhook_url = webhook_url
@@ -31,9 +34,10 @@ class Bot:
 
     async def initialize_cache(self):
         await self.monthly_stats_cache.get_stats(self.airtable_tables, force_refresh=True)
+        israel_time = ZoneInfo('Asia/Jerusalem')
         self.application.job_queue.run_daily(
             self.monthly_stats_cache.update_daily,
-            time=time(hour=0, minute=0),
+            time=time(hour=0, minute=0, tzinfo=israel_time),
             data={'airtable_tables': self.airtable_tables}
         )
 
@@ -49,7 +53,6 @@ class Bot:
         self.application.add_handler(CommandHandler("month", send_monthly_update))
 
         # Initialize other components
-        self.airtable_tables = init_airtable_tables()
         self.application.bot_data['airtable_tables'] = self.airtable_tables
         await self.initialize_cache()
         schedule_daily_report(self.application, self.chat_id)

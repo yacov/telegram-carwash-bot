@@ -1,14 +1,13 @@
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat, User
-from telegram.ext import ContextTypes
-from telegram.constants import ParseMode
-from database import get_today_stats, get_yesterday_stats, get_worker_data, get_monthly_stats
-from keyboards import get_language_menu, get_main_keyboard, LANGUAGES
-from message_constants import MESSAGES
-from datetime import datetime
-from utils import is_user_admin, get_message
-from telegram.error import BadRequest
 
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
+
+from database import get_today_stats, get_yesterday_stats, get_monthly_stats
+from keyboards import get_language_menu, get_main_keyboard, LANGUAGES
+from utils import get_israel_time
+from utils import is_user_admin, get_message
 
 logger = logging.getLogger(__name__)
 
@@ -35,116 +34,108 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-    
+
     language = query.data.split("|")[1]
-    
+
     # Save the selected language in user_data
     context.user_data['language'] = language
-    
+
     # Also save it in bot_data for persistence across restarts
     if 'user_languages' not in context.bot_data:
         context.bot_data['user_languages'] = {}
     context.bot_data['user_languages'][update.effective_user.id] = language
-    
+
     message = get_message("language_set", language).format(LANGUAGES[language])
     chat = update.effective_chat
     user = update.effective_user
     keyboard = await get_main_keyboard(language, chat, user, context)
     await query.edit_message_text(
-        text=message, 
+        text=message,
         reply_markup=keyboard,
         parse_mode=ParseMode.HTML
     )
 
 async def send_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
-        airtable_tables = context.bot_data.get('airtable_tables', {})
-        stats = await get_today_stats(airtable_tables)
-        current_time = datetime.now().strftime("%H:%M")
-        user_language = context.user_data.get('language', 'ru')
-        message_text = generate_message_text(stats, current_time, user_language)
-        
-        chat = update.effective_chat
         user = update.effective_user
+        user_language = context.user_data.get('language', 'ru')
+        airtable_tables = context.bot_data.get('airtable_tables', {})
+
+        if 'scans' not in airtable_tables:
+            logger.error("Scans table not found in Airtable tables")
+            await update.message.reply_text(get_message("failed_update", user_language))
+            return
+
+        stats = await get_today_stats(airtable_tables)
+        current_time = get_israel_time().strftime("%H:%M")
+        message_text = generate_message_text(stats, current_time, user_language)
+
+        chat = update.effective_chat
         keyboard = await get_main_keyboard(user_language, chat, user, context)
-        
-        if update.callback_query:
-            await update.callback_query.edit_message_text(
-                text=message_text,
-                reply_markup=keyboard,
-                parse_mode=ParseMode.HTML
-            )
-        else:
-            await update.message.reply_text(
-                text=message_text,
-                reply_markup=keyboard,
-                parse_mode=ParseMode.HTML
-            )
+
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=message_text,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML
+        )
     except Exception as e:
         logger.exception(f"Error in send_update: {str(e)}")
         user_language = context.user_data.get('language', 'ru')
-        error_message = get_message("failed_update", user_language).format(str(e))
-        if update.callback_query:
-            await update.callback_query.answer(error_message, show_alert=True)
-        else:
-            await update.message.reply_text(error_message)
+        await update.message.reply_text(get_message("failed_update", user_language).format(str(e)))
 
 async def send_yesterday_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if not await is_user_admin(chat, user, context):
+        await update.message.reply_text("You don't have permission to access this information.")
+        return
+
     try:
-        airtable_tables = context.bot_data.get('airtable_tables', {})
-        stats = await get_yesterday_stats(airtable_tables)
-        logger.info(f"Yesterday stats: {stats}")
         user_language = context.user_data.get('language', 'ru')
+        airtable_tables = context.bot_data.get('airtable_tables', {})
+
+        if 'scans' not in airtable_tables:
+            logger.error("Scans table not found in Airtable tables")
+            await update.message.reply_text(get_message("failed_update", user_language))
+            return
+
+        stats = await get_yesterday_stats(airtable_tables)
         message_text = generate_yesterday_message_text(stats, user_language)
-        logger.info(f"Generated message: {message_text}")
-        chat = update.effective_chat
-        user = update.effective_user
+
         keyboard = await get_main_keyboard(user_language, chat, user, context)
 
-        if update.callback_query:
-            # Check if the message content is different before editing
-            if update.callback_query.message.text != message_text:
-                await update.callback_query.edit_message_text(
-                    text=message_text,
-                    reply_markup=keyboard,
-                    parse_mode=ParseMode.HTML
-                )
-            else:
-                await update.callback_query.answer("No changes in yesterday's data.")
-        else:
-            await update.message.reply_text(
-                text=message_text,
-                reply_markup=keyboard,
-                parse_mode=ParseMode.HTML
-            )
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=message_text,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML
+        )
     except Exception as e:
         logger.exception(f"Error in send_yesterday_update: {str(e)}")
         user_language = context.user_data.get('language', 'ru')
-        error_message = get_message("failed_update", user_language).format(str(e))
-        if update.callback_query:
-            await update.callback_query.answer(error_message, show_alert=True)
-        else:
-            await update.message.reply_text(error_message)
+        await update.message.reply_text(get_message("failed_update", user_language).format(str(e)))
 
 async def send_monthly_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
+        user = update.effective_user
+        user_language = context.user_data.get('language', 'ru')
         airtable_tables = context.bot_data.get('airtable_tables', {})
         monthly_stats_cache = context.bot_data.get('monthly_stats_cache')
-        
+
         if monthly_stats_cache:
             stats = await monthly_stats_cache.get_stats(airtable_tables)
         else:
             stats = await get_monthly_stats(airtable_tables)
-        
-        user_language = context.user_data.get('language', 'ru')
+
         message_text = generate_monthly_message_text(stats, user_language)
 
         chat = update.effective_chat
-        user = update.effective_user
         keyboard = await get_main_keyboard(user_language, chat, user, context)
 
         await context.bot.send_message(
-            chat_id=chat.id,
+            chat_id=user.id,
             text=message_text,
             reply_markup=keyboard,
             parse_mode=ParseMode.HTML
@@ -169,7 +160,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif query.data == "language":
         message = get_message("select_language", user_language)
         await query.edit_message_text(
-            text=message, 
+            text=message,
             reply_markup=get_language_menu(),
             parse_mode=ParseMode.HTML
         )
