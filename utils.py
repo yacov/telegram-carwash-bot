@@ -1,7 +1,6 @@
 import logging
 import os
-import datetime
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from typing import Dict, Union, Tuple
 
 import pytz
